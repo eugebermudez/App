@@ -1,0 +1,405 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Comidas</title>
+    <meta name="theme-color" content="#4CAF50">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon.png">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1, h2 {
+            color: #333;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .form-container, .records-container {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea, button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #clearAll {
+            background-color: #f44336;
+        }
+        #clearAll:hover {
+            background-color: #da190b;
+        }
+        #exportCSV {
+            background-color: #2196F3;
+        }
+        #exportCSV:hover {
+            background-color: #0b7dda;
+        }
+        .delete-btn {
+            background-color: #f44336;
+            padding: 5px 10px;
+            width: auto;
+            font-size: 14px;
+        }
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        td:empty::before {
+            content: " ";
+            white-space: pre;
+        }
+        a {
+            color: #2196F3;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 8px 16px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        a:hover {
+            background-color: #0b7dda;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5em;
+            }
+            h2 {
+                font-size: 1.2em;
+            }
+            .form-container, .records-container {
+                padding: 10px;
+            }
+            input, select, textarea, button {
+                font-size: 14px;
+                padding: 6px;
+            }
+            th, td {
+                font-size: 12px;
+                padding: 6px;
+                min-height: 20px;
+            }
+            .delete-btn {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+            table, thead, tbody, tr, th, td {
+                display: block;
+            }
+            thead {
+                display: none;
+            }
+            tr {
+                margin-bottom: 10px;
+                border-bottom: 2px solid #ddd;
+                padding-bottom: 10px;
+            }
+            td {
+                position: relative;
+                padding-left: 50%;
+                text-align: left;
+                min-height: 20px;
+            }
+            td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 6px;
+                width: 45%;
+                padding-right: 10px;
+                font-weight: bold;
+                white-space: nowrap;
+            }
+            td:empty::before {
+                content: attr(data-label);
+                white-space: nowrap;
+            }
+            td:last-child {
+                padding-left: 6px;
+            }
+            a {
+                font-size: 14px;
+                padding: 6px 12永久link12px;
+            }
+        }
+    </style>
+</head>
+<body id="inicio">
+    <h1>Registro de Comidas</h1>
+
+    <div class="form-container">
+        <h2>Agregar Registro</h2>
+        <form id="foodForm">
+            <div class="form-group">
+                <label for="date">Fecha</label>
+                <input type="date" id="date" required>
+            </div>
+            <div class="form-group">
+                <label for="mealType">Tipo de Comida</label>
+                <select id="mealType" required>
+                    <option value="">Selecciona un tipo</option>
+                    <option value="Desayuno">Desayuno</option>
+                    <option value="Media Mañana">Media Mañana</option>
+                    <option value="Almuerzo">Almuerzo</option>
+                    <option value="Media Tarde">Media Tarde</option>
+                    <option value="Merienda">Merienda</option>
+                    <option value="Cena">Cena</option>
+                    <option value="Post Cena">Post Cena</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="time">Hora</label>
+                <input type="time" id="time" required>
+            </div>
+            <div class="form-group">
+                <label for="foodType">Tipo de Alimento</label>
+                <input type="text" id="foodType" required>
+            </div>
+            <div class="form-group">
+                <label for="quantity">Cantidad</label>
+                <input type="text" id="quantity" required>
+            </div>
+            <div class="form-group">
+                <label for="activity">Actividad Física</label>
+                <input type="text" id="activity">
+            </div>
+            <div class="form-group">
+                <label for="notes">Observaciones</label>
+                <textarea id="notes" rows="3"></textarea>
+            </div>
+            <button type="submit">Registrar</button>
+        </form>
+    </div>
+
+    <div class="records-container">
+        <h2>Registros</h2>
+        <button id="exportCSV">Exportar a CSV</button>
+        <table id="recordsTable">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo de Comida</th>
+                    <th>Hora</th>
+                    <th>Tipo de Alimento</th>
+                    <th>Cantidad</th>
+                    <th>Actividad Física</th>
+                    <th>Observaciones</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+        </table>
+        <button id="clearAll">Borrar Todo</button>
+    </div>
+
+    <a href="#inicio">Inicio</a>
+
+    <script>
+        // Load records from localStorage on page load
+        let records = JSON.parse(localStorage.getItem('foodRecords')) || [];
+
+        // Function to save records to localStorage
+        function saveRecords() {
+            localStorage.setItem('foodRecords', JSON.stringify(records));
+        }
+
+        // Function to sort records by date (most recent first) and time
+        function sortRecords() {
+            records.sort((a, b) => {
+                const dateA = new Date(a.date + 'T' + a.time);
+                const dateB = new Date(b.date + 'T' + b.time);
+                return dateB - dateA; // Most recent first
+            });
+        }
+
+        // Function to display records in the table
+        function displayRecords() {
+            sortRecords(); // Sort before displaying
+            const recordsBody = document.getElementById('recordsBody');
+            recordsBody.innerHTML = '';
+            records.forEach((record, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td data-label="Fecha">${record.date}</td>
+                    <td data-label="Tipo de Comida">${record.mealType}</td>
+                    <td data-label="Hora">${record.time}</td>
+                    <td data-label="Tipo de Alimento">${record.foodType}</td>
+                    <td data-label="Cantidad">${record.quantity}</td>
+                    <td data-label="Actividad Física">${record.activity || ''}</td>
+                    <td data-label="Observaciones">${record.notes || ''}</td>
+                    <td data-label=""><button class="delete-btn" data-index="${index}">Eliminar</button></td>
+                `;
+                recordsBody.appendChild(row);
+            });
+            // Add event listeners to delete buttons
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    if (confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+                        records.splice(index, 1);
+                        saveRecords();
+                        displayRecords();
+                    }
+                });
+            });
+        }
+
+        // Form submission handler
+        document.getElementById('foodForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const record = {
+                date: document.getElementById('date').value,
+                mealType: document.getElementById('mealType').value,
+                time: document.getElementById('time').value,
+                foodType: document.getElementById('foodType').value,
+                quantity: document.getElementById('quantity').value,
+                activity: document.getElementById('activity').value,
+                notes: document.getElementById('notes').value
+            };
+            records.push(record);
+            saveRecords();
+            displayRecords();
+            this.reset();
+        });
+
+        // Clear all records
+        document.getElementById('clearAll').addEventListener('click', function() {
+            if (confirm('¿Estás seguro de que deseas borrar todos los registros?')) {
+                records = [];
+                saveRecords();
+                displayRecords();
+            }
+        });
+
+        // Export to CSV
+        document.getElementById('exportCSV').addEventListener('click', function() {
+            if (records.length === 0) {
+                alert('No hay registros para exportar.');
+                return;
+            }
+            sortRecords(); // Sort before exporting
+            const headers = ['Fecha', 'Tipo de Comida', 'Hora', 'Tipo de Alimento', 'Cantidad', 'Actividad Física', 'Observaciones'];
+            const csvRows = [
+                headers.join(','),
+                ...records.map(record => 
+                    `"${record.date}","${record.mealType}","${record.time}","${record.foodType}","${record.quantity}","${record.activity || ''}","${record.notes || ''}"`
+                )
+            ];
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectelleenObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'registros_comidas.csv');
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Service Worker registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('sw.js')
+                    .then(function(registration) {
+                        console.log('Service Worker registered with scope: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                        console.log('Service Worker registration failed: ', error);
+                    });
+            });
+        }
+
+        // Initial display of records
+        displayRecords();
+    </script>
+</body>
+</html>
